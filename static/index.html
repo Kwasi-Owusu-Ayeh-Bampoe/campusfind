@@ -744,7 +744,7 @@
     <section class="hero">
       <div>
         <h1>
-          Reunite with what you <span>lost</span> — or return what you
+          Reunite with what you <span>lost</span> or return what you
           <span>found</span>.
         </h1>
         <p>
@@ -916,6 +916,7 @@
       </div>
     </div>
 
+    <!-- ✅ UPDATED: Added Contact Number field to Sign Up -->
     <div class="modal-backdrop" id="registerModal">
       <div class="modal">
         <div class="modal-head">
@@ -924,11 +925,26 @@
         </div>
         <form id="registerForm" class="modal-body">
           <div class="field">
-            <label>Username</label><input name="username" required />
+            <label>Username</label>
+            <input name="username" required />
           </div>
           <div class="field">
-            <label>Password</label
-            ><input name="password" type="password" required />
+            <label>Password</label>
+            <input
+              name="password"
+              type="password"
+              required
+              placeholder="Create A Strong Password"
+            />
+          </div>
+          <div class="field">
+            <label>Contact Number</label>
+            <input
+              name="contact"
+              type="tel"
+              required
+              placeholder="e.g. +233 24 123 4567"
+            />
           </div>
         </form>
         <div class="modal-foot">
@@ -954,7 +970,7 @@
     <footer>
       <p>
         🎓 CampusFind · A community project for students and staff · Made with
-        care
+        care CAMPUS FIND COPYRIGHT @2026
       </p>
     </footer>
 
@@ -1134,6 +1150,9 @@
       function render() {
         const grid = document.getElementById("grid");
         const filtered = items.filter((it) => {
+          // Hide claimed items from the main public board
+          if (it.status === "claimed" && !filterMine) return false;
+          if (filterMine && it.owner !== currentUser) return false;
           if (filterMine && it.owner !== currentUser) return false;
           if (filterType !== "all" && it.type !== filterType) return false;
           if (filterCat !== "all" && it.category !== filterCat) return false;
@@ -1162,7 +1181,7 @@
               return `
         <article class="card" onclick="openDetail('${it.item_id}')">
           <div class="thumb" style="${thumbStyle}">
-            <span class="badge ${it.type} ${it.status === "resolved" ? "resolved" : ""}">${it.status === "resolved" ? "Resolved" : it.type}</span>
+                <span class="badge ${it.type} ${it.status === "resolved" || it.status === "claimed" ? "resolved" : ""}">${it.status === "claimed" ? "Claimed" : it.status === "resolved" ? "Resolved" : it.type}</span>
             ${it.photo_url ? "" : categoryEmoji[it.category] || "📦"}
           </div>
           <div class="card-body">
@@ -1189,12 +1208,17 @@
       }
 
       function updateStats() {
-        document.getElementById("statTotal").textContent = items.length;
-        document.getElementById("statFound").textContent = items.filter(
+        // Don't count claimed items in the active "Listings" total
+        const activeItems = items.filter((i) => i.status !== "claimed");
+
+        document.getElementById("statTotal").textContent = activeItems.length;
+        document.getElementById("statFound").textContent = activeItems.filter(
           (i) => i.type === "found",
         ).length;
+
+        // Count BOTH resolved and claimed items as "Reunited"
         document.getElementById("statResolved").textContent = items.filter(
-          (i) => i.status === "resolved",
+          (i) => i.status === "resolved" || i.status === "claimed",
         ).length;
       }
 
@@ -1311,12 +1335,35 @@
         </div>
       </div>
       <div class="modal-foot">
-        ${isOwner && it.status === "open" ? `<button class="btn btn-outline" onclick="resolveItem('${it.item_id}')">✓ Mark as resolved</button>` : ""}
+        ${isOwner && it.status === "open" ? `<button class="btn btn-primary" style="background:var(--found)" onclick="claimItem('${it.item_id}')">🎉 Item Claimed</button>` : ""}
         ${isOwner ? `<button class="btn btn-outline" onclick="deleteItem('${it.item_id}')">🗑 Delete</button>` : ""}
         <button class="btn btn-primary" onclick="contactOwner('${it.item_id}')">💬 Contact ${escapeHtml(it.owner.split(" ")[0])}</button>
       </div>
     `;
         document.getElementById("detailModal").classList.add("open");
+      }
+
+      async function claimItem(itemId) {
+        if (
+          !confirm(
+            "Mark this item as claimed? It will be removed from the public board.",
+          )
+        )
+          return;
+        const res = await fetch(`/api/items/${itemId}/claim`, {
+          method: "POST",
+        });
+        const data = await res.json();
+        if (res.ok) {
+          toast(
+            "Item successfully claimed and hidden from the board! 🎉",
+            "success",
+          );
+          closeModal("detailModal");
+          await loadItems();
+        } else {
+          toast(data.error, "error");
+        }
       }
 
       async function resolveItem(itemId) {
